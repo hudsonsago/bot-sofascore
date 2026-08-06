@@ -1,8 +1,22 @@
+import os
 import time
+import threading
 import requests
+from flask import Flask
 from curl_cffi import requests as c_requests
 
-# Credenciais
+# --- SERVIDOR WEB PARA O RENDER (MANTÉM O WEB SERVICE ATIVO) ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot SofaScore Rodando 24/7!", 200
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+# --- CREDENCIAIS DO BOT ---
 TELEGRAM_BOT_TOKEN = "8725940003:AAHRHvUYcVQ6fW2_6pbB0QJxTvJOCnXZQYg"
 TELEGRAM_CHAT_ID = "1099565196"
 
@@ -12,9 +26,6 @@ HEADERS = {
     'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
     'Referer': 'https://www.sofascore.com/'
 }
-
-# Bypass do proxy restrito do PythonAnywhere
-NO_PROXY = {"http": "", "https": ""}
 
 alerted_events = {}
 
@@ -34,12 +45,7 @@ def send_telegram_alert(message):
 def get_live_events():
     url = "https://api.sofascore.com/api/v3/event/live"
     try:
-        response = c_requests.get(
-            url, 
-            headers=HEADERS, 
-            impersonate="chrome120", 
-            proxies=NO_PROXY
-        )
+        response = c_requests.get(url, headers=HEADERS, impersonate="chrome120")
         if response.status_code == 200:
             return response.json().get('events', [])
         return []
@@ -57,12 +63,7 @@ def parse_stat_group(groups, stat_name):
 def get_match_stats(event_id):
     url = f"https://api.sofascore.com/api/v3/event/{event_id}/statistics"
     try:
-        response = c_requests.get(
-            url, 
-            headers=HEADERS, 
-            impersonate="chrome120", 
-            proxies=NO_PROXY
-        )
+        response = c_requests.get(url, headers=HEADERS, impersonate="chrome120")
         if response.status_code != 200:
             return None
 
@@ -156,11 +157,18 @@ def analyze_and_notify():
             alerted_events[event_id] = 2
             time.sleep(2)
 
-if __name__ == "__main__":
-    send_telegram_alert("🤖 *Bot do SofaScore Iniciado no PythonAnywhere!*")
+def start_bot():
+    send_telegram_alert("🤖 *Bot do SofaScore Iniciado no Render (Web Service)!*")
     while True:
         try:
             analyze_and_notify()
         except Exception as e:
-            print(f"Erro no loop: {e}")
+            print(f"Erro no loop do bot: {e}")
         time.sleep(150)
+
+if __name__ == "__main__":
+    # Inicia o servidor Flask em segundo plano para o Render reconhecer a porta
+    threading.Thread(target=run_web_server, daemon=True).start()
+    
+    # Inicia o loop de monitoramento do bot
+    start_bot()

@@ -13,6 +13,9 @@ HEADERS = {
     'Referer': 'https://www.sofascore.com/'
 }
 
+# Bypass do proxy restrito do PythonAnywhere
+NO_PROXY = {"http": "", "https": ""}
+
 alerted_events = {}
 
 def send_telegram_alert(message):
@@ -31,7 +34,12 @@ def send_telegram_alert(message):
 def get_live_events():
     url = "https://api.sofascore.com/api/v3/event/live"
     try:
-        response = c_requests.get(url, headers=HEADERS, impersonate="chrome120")
+        response = c_requests.get(
+            url, 
+            headers=HEADERS, 
+            impersonate="chrome120", 
+            proxies=NO_PROXY
+        )
         if response.status_code == 200:
             return response.json().get('events', [])
         return []
@@ -49,7 +57,12 @@ def parse_stat_group(groups, stat_name):
 def get_match_stats(event_id):
     url = f"https://api.sofascore.com/api/v3/event/{event_id}/statistics"
     try:
-        response = c_requests.get(url, headers=HEADERS, impersonate="chrome120")
+        response = c_requests.get(
+            url, 
+            headers=HEADERS, 
+            impersonate="chrome120", 
+            proxies=NO_PROXY
+        )
         if response.status_code != 200:
             return None
 
@@ -100,7 +113,7 @@ def analyze_and_notify():
         chances_sem_gol = total_big_chances - total_goals
         last_alert_level = alerted_events.get(event_id, 0)
 
-        # NÍVEL 2: URGENTE (3+ chances)
+        # NÍVEL 2: URGENTE (3+ chances sem gol)
         if chances_sem_gol >= 3 and last_alert_level < 3:
             if total_goals == 0:
                 cabecalho = "🚨🚨🚨 *URGENTE: 0x0 COM 3+ GRANDES CHANCES* 🚨🚨🚨"
@@ -123,7 +136,7 @@ def analyze_and_notify():
             alerted_events[event_id] = 3
             time.sleep(2)
 
-        # NÍVEL 1: ATENÇÃO (2 chances)
+        # NÍVEL 1: ATENÇÃO (2 chances sem gol)
         elif chances_sem_gol == 2 and last_alert_level < 2:
             if total_goals == 0:
                 cabecalho = "🚨 *ALERTA: 0x0 COM 2 GRANDES CHANCES*"
@@ -144,7 +157,7 @@ def analyze_and_notify():
             time.sleep(2)
 
 if __name__ == "__main__":
-    send_telegram_alert("🤖 *Bot do SofaScore Iniciado!*")
+    send_telegram_alert("🤖 *Bot do SofaScore Iniciado no PythonAnywhere!*")
     while True:
         try:
             analyze_and_notify()
